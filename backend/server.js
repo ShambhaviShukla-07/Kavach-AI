@@ -1,4 +1,4 @@
-require('dotenv').config()
+require('dotenv').config({ path: require('path').resolve(__dirname, '.env') })
 console.log('Mongo URI loaded:', !!process.env.MONGO_URI)
 const express = require('express')
 const http = require('http')

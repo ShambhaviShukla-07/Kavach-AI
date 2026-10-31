@@ -85,7 +85,7 @@ const userSchema = new mongoose.Schema({
     }
   },
 
-  // Saved emergency contacts for the Women Safety module
+    // Saved emergency contacts for the Women Safety module
   emergencyContacts: {
     type: [emergencyContactSchema],
     default: [],
@@ -93,7 +93,19 @@ const userSchema = new mongoose.Schema({
       validator: contacts => contacts.length <= 10,
       message: 'You can save a maximum of 10 emergency contacts'
     }
+  },
+
+  // Password reset fields
+  resetPasswordToken: {
+    type: String,
+    default: undefined
+  },
+
+  resetPasswordExpires: {
+    type: Date,
+    default: undefined
   }
+
 }, { timestamps: true })
 
 userSchema.index({ location: '2dsphere' })

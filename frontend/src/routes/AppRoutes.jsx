@@ -12,6 +12,8 @@ import Profile from '../pages/Profile'
 import Landing from '../pages/public/Landing'
 import Login from '../pages/auth/Login'
 import Register from '../pages/auth/Register'
+import ForgotPassword from '../pages/auth/ForgotPassword'
+import ResetPassword from '../pages/auth/ResetPassword'
 
 // Citizen Pages
 import CitizenDashboard from '../pages/citizen/CitizenDashboard'
@@ -44,10 +46,12 @@ export default function AppRoutes() {
       </Route>
 
       {/* Authentication Pages */}
-      <Route element={<AuthLayout />}>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-      </Route>
+<Route element={<AuthLayout />}>
+  <Route path="/login" element={<Login />} />
+  <Route path="/register" element={<Register />} />
+  <Route path="/forgot-password" element={<ForgotPassword />} />
+  <Route path="/reset-password/:token" element={<ResetPassword />} />
+</Route>
 
       {/* Protected Application Pages */}
       <Route

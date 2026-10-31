@@ -140,7 +140,7 @@ export default function WomenSafety() {
       .map((contact) => ({
         name: contact.name.trim(),
         phone: contact.phone.trim(),
-        email: contact.email.trim(),
+        email: contact.email.trim().toLowerCase(),
       }))
 
     if (
@@ -199,6 +199,7 @@ export default function WomenSafety() {
       return false
     }
 
+    // Name, phone AND email are sent to backend
     const filledContacts = contacts
       .filter(
         (contact) =>
@@ -207,6 +208,7 @@ export default function WomenSafety() {
       .map((contact) => ({
         name: contact.name.trim(),
         phone: contact.phone.trim(),
+        email: contact.email?.trim().toLowerCase() || '',
       }))
 
     setSosLoading(true)

@@ -434,64 +434,87 @@ const triggerSOS = asyncHandler(async (req, res) => {
     timeZone: 'Asia/Kolkata'
   });
 
-  // ========================================
-  // SEND EMAIL NOTIFICATIONS
-  // ========================================
-  const emailContacts = safeContacts.filter(
-    contact => contact.email
+ // ========================================
+// SEND EMAIL NOTIFICATIONS
+// ========================================
+
+console.log('\n========== EMAIL DEBUG START ==========');
+
+console.log('Total emergency contacts:', safeContacts.length);
+
+const emailContacts = safeContacts.filter(
+  contact => contact.email && contact.email.trim()
+);
+
+console.log('Contacts with email:', emailContacts.length);
+
+const emailConfigured = Boolean(
+  process.env.EMAILJS_SERVICE_ID &&
+  process.env.EMAILJS_TEMPLATE_ID &&
+  process.env.EMAILJS_PUBLIC_KEY
+);
+
+console.log('EmailJS Service ID configured:', !!process.env.EMAILJS_SERVICE_ID);
+console.log('EmailJS Template ID configured:', !!process.env.EMAILJS_TEMPLATE_ID);
+console.log('EmailJS Public Key configured:', !!process.env.EMAILJS_PUBLIC_KEY);
+
+let emailStatus = 'not_configured';
+let emailSent = 0;
+let emailFailed = 0;
+
+if (!emailConfigured) {
+  emailStatus = 'not_configured';
+  console.error('EMAIL ERROR: EmailJS configuration is incomplete.');
+}
+else if (emailContacts.length === 0) {
+  emailStatus = 'no_email_contacts';
+  console.error('EMAIL ERROR: No emergency contact has an email address.');
+}
+else {
+  console.log('Starting EmailJS notification process...');
+
+  const emailResults = await Promise.all(
+    emailContacts.map(contact =>
+      sendSOSEmail({
+        contact,
+        userName: currentUser.name,
+        location: {
+          address: safeAddress,
+          mapsUrl: validMapsUrl
+        },
+        alertTime,
+        alertId: sos._id.toString()
+      })
+    )
   );
 
-  let emailStatus = 'not_configured';
-  let emailSent = 0;
-  let emailFailed = 0;
+  emailSent = emailResults.filter(
+    result => result.status === 'sent'
+  ).length;
 
-  const emailConfigured = Boolean(
-    process.env.EMAILJS_SERVICE_ID &&
-    process.env.EMAILJS_TEMPLATE_ID &&
-    process.env.EMAILJS_PUBLIC_KEY
-  );
+  emailFailed = emailResults.filter(
+    result => result.status === 'failed' ||
+              result.status === 'not_configured'
+  ).length;
 
-  if (emailConfigured && emailContacts.length > 0) {
-    const emailResults = await Promise.all(
-      emailContacts.map(contact =>
-        sendSOSEmail({
-          contact,
-          userName: currentUser.name,
-          location: {
-            address: safeAddress,
-            mapsUrl: validMapsUrl
-          },
-          alertTime,
-          alertId: sos._id.toString()
-        })
-      )
-    );
-
-    emailSent = emailResults.filter(
-      result => result.status === 'sent'
-    ).length;
-
-    emailFailed = emailResults.filter(
-      result =>
-        result.status === 'failed' ||
-        result.status === 'not_configured'
-    ).length;
-
-    if (emailSent === emailContacts.length) {
-      emailStatus = 'sent';
-    } else if (emailSent > 0) {
-      emailStatus = 'partially_sent';
-    } else {
-      emailStatus = 'failed';
-    }
-  } else if (
-    emailConfigured &&
-    emailContacts.length === 0
-  ) {
-    emailStatus = 'no_email_contacts';
-  } else {
-    emailStatus = 'not_configured';
+  if (emailSent === emailContacts.length) {
+    emailStatus = 'sent';
   }
+  else if (emailSent > 0) {
+    emailStatus = 'partially_sent';
+  }
+  else {
+    emailStatus = 'failed';
+  }
+
+  console.log('Email results:', emailResults);
+}
+
+console.log('Final Email Status:', emailStatus);
+console.log('Emails Sent:', emailSent);
+console.log('Emails Failed:', emailFailed);
+
+console.log('========== EMAIL DEBUG END ==========\n');
 
   // ========================================
   // SEND SMS NOTIFICATIONS THROUGH TEXTBEE

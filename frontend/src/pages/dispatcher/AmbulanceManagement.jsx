@@ -481,9 +481,7 @@ export default function AmbulanceManagement() {
               </h2>
 
               <p className="mt-1 text-sm text-amber-100/80">
-                {missingLocationCount} ambulance(s) ki location saved
-                nahi hai. Edit Ambulance par jaakar Get Current GPS
-                use karo.
+                {missingLocationCount} The GPS location for {missingLocationCount} ambulance(s) has not been saved. Please click "Edit Ambulance" and use "Get Current GPS" to update its location.
               </p>
             </div>
           </div>
