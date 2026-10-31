@@ -26,7 +26,8 @@ dispatcher: [
 { to: '/dispatcher/dashboard', icon: <FiHome />, label: 'Dashboard' },
 { to: '/dispatcher/emergencies', icon: <FiAlertCircle />, label: 'Emergency Requests' },
 { to: '/dispatcher/ambulances', icon: <FiTruck />, label: 'Ambulance Management' },
-{ to: '/dispatcher/tracking', icon: <FiMapPin />, label: 'Live Tracking' }
+{ to: '/dispatcher/tracking', icon: <FiMapPin />, label: 'Live Tracking' },
+{ to: '/dispatcher/helmet', icon: <FiShield />, label: 'Helmet Monitor' },
 ],
 
 driver: [

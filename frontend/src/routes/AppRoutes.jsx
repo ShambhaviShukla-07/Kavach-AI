@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import PublicLayout from '../layouts/PublicLayout'
 import AuthLayout from '../layouts/AuthLayout'
 import DashboardLayout from '../layouts/DashboardLayout'
-
+import HelmetMonitor from '../pages/dispatcher/HelmetMonitor'
 import ProtectedRoute from './ProtectedRoute'
 import RoleRoute from './RoleRoute'
 
@@ -118,7 +118,14 @@ export default function AppRoutes() {
             </RoleRoute>
           }
         />
-
+<Route
+  path="/dispatcher/helmet"
+  element={
+    <RoleRoute roles={['dispatcher']}>
+      <HelmetMonitor />
+    </RoleRoute>
+  }
+/>
         <Route
           path="/dispatcher/emergencies"
           element={

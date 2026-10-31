@@ -20,6 +20,8 @@ import {
 import { womenSafetyService } from '../../services/womenSafetyService'
 import { useGeolocation } from '../../hooks/useGeolocation'
 import { StatusBadge } from '../../components/ui/SeverityBadge'
+import VoiceSosButton from '../../components/VoiceSosButton'
+import { useVoiceAssistant } from '../../hooks/useVoiceAssistant'
 import Loader from '../../components/common/Loader'
 import toast from 'react-hot-toast'
 
@@ -39,7 +41,7 @@ export default function WomenSafety() {
   const [loading, setLoading] = useState(true)
   const [sosLoading, setSosLoading] = useState(false)
   const [resolvingId, setResolvingId] = useState(null)
-
+  const { speak } = useVoiceAssistant()
   const [contacts, setContacts] = useState([emptyContact()])
   const [contactsLoading, setContactsLoading] = useState(true)
   const [savingContacts, setSavingContacts] = useState(false)
@@ -189,11 +191,12 @@ export default function WomenSafety() {
   }
 
   const triggerSOS = async () => {
-    if (sosLoading) return
+    if (sosLoading) return false
 
     if (!location) {
       toast.error('Allow location access before triggering SOS')
-      return
+      speak('Location is not ready. Allow location access before using SOS.')
+      return false
     }
 
     const filledContacts = contacts
@@ -232,10 +235,18 @@ export default function WomenSafety() {
       } else {
         toast.success('SOS alert triggered successfully')
       }
+
+      speak(
+        `SOS alert created. Your location is ${location.lat.toFixed(5)}, ${location.lng.toFixed(5)}. If this is life threatening, call 112.`
+      )
+
+      return true
     } catch (error) {
       toast.error(
         error.response?.data?.message || 'SOS failed'
       )
+      speak('SOS failed. Call 112 if you are in danger.')
+      return false
     } finally {
       setSosLoading(false)
     }
@@ -258,6 +269,7 @@ export default function WomenSafety() {
       )
 
       toast.success('SOS alert resolved')
+      speak('SOS alert resolved.')
     } catch (error) {
       toast.error(
         error.response?.data?.message ||
@@ -383,6 +395,12 @@ export default function WomenSafety() {
                 </>
               )}
             </motion.button>
+
+            <VoiceSosButton
+              onSos={triggerSOS}
+              disabled={sosLoading}
+              locationReady={Boolean(location)}
+            />
 
             <h2 className="mt-6 text-xl font-bold">
               {sosLoading

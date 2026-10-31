@@ -12,10 +12,6 @@ const asyncHandler = require('../utils/asyncHandler');
 const sendTextBeeSMS = async (phone, message) => {
   const apiKey = process.env.TEXTBEE_API_KEY;
 
-  console.log('TextBee key loaded:', Boolean(apiKey));
-console.log('TextBee key length:', apiKey?.trim().length);
-console.log('TextBee key prefix:', apiKey?.trim().slice(0, 4));
-
   if (!apiKey) {
     console.error('TextBee API key is missing');
     return {
@@ -211,14 +207,16 @@ const sendSOSEmail = async ({
   contact,
   userName,
   location,
-  alertTime
+  alertTime,
+  alertId
 }) => {
   const serviceId = process.env.EMAILJS_SERVICE_ID;
   const templateId = process.env.EMAILJS_TEMPLATE_ID;
   const publicKey = process.env.EMAILJS_PUBLIC_KEY;
   const privateKey = process.env.EMAILJS_PRIVATE_KEY;
 
-  if (!serviceId || !templateId || !publicKey || !privateKey) {
+  // The private key is only required when EmailJS strict mode is enabled.
+  if (!serviceId || !templateId || !publicKey) {
     console.error(
       'EmailJS configuration incomplete. Check backend .env.'
     );
@@ -247,16 +245,23 @@ const sendSOSEmail = async ({
           template_id: templateId,
           user_id: publicKey,
 
-          // Required when EmailJS strict mode is enabled
-          accessToken: privateKey,
+          // Required only when EmailJS strict mode is enabled.
+          ...(privateKey ? { accessToken: privateKey } : {}),
 
           template_params: {
             to_email: contact.email,
+            to_name: contact.name,
+            from_name: userName || 'KavachAI user',
             user_name: userName || 'KavachAI user',
+            subject: `KavachAI SOS alert${
+              alertId ? ` ${alertId}` : ''
+            }`,
             message:
               'An emergency SOS alert has been triggered. Please contact the person immediately.',
             location: location.address,
             maps_url: location.mapsUrl,
+            map_url: location.mapsUrl,
+            alert_id: alertId || '',
             alert_time: alertTime
           }
         })
@@ -443,8 +448,7 @@ const triggerSOS = asyncHandler(async (req, res) => {
   const emailConfigured = Boolean(
     process.env.EMAILJS_SERVICE_ID &&
     process.env.EMAILJS_TEMPLATE_ID &&
-    process.env.EMAILJS_PUBLIC_KEY &&
-    process.env.EMAILJS_PRIVATE_KEY
+    process.env.EMAILJS_PUBLIC_KEY
   );
 
   if (emailConfigured && emailContacts.length > 0) {
@@ -457,7 +461,8 @@ const triggerSOS = asyncHandler(async (req, res) => {
             address: safeAddress,
             mapsUrl: validMapsUrl
           },
-          alertTime
+          alertTime,
+          alertId: sos._id.toString()
         })
       )
     );
