@@ -10,8 +10,10 @@ import {
   FiUser,
   FiX,
   FiMapPin,
+  FiCrosshair,
 } from 'react-icons/fi'
 import toast from 'react-hot-toast'
+
 import { ambulanceService } from '../../services/ambulanceService'
 import Button from '../../components/ui/Button'
 import Loader from '../../components/common/Loader'
@@ -54,16 +56,15 @@ function getErrorMessage(error) {
 function getCoordinates(ambulance) {
   const coordinates = ambulance?.location?.coordinates
 
-  if (!Array.isArray(coordinates) || coordinates.length !== 2) {
+  if (
+    !Array.isArray(coordinates) ||
+    coordinates.length !== 2 ||
+    (coordinates[0] === 0 && coordinates[1] === 0)
+  ) {
     return { latitude: '', longitude: '' }
   }
 
   const [longitude, latitude] = coordinates
-
-  // Treat the default MongoDB coordinates as an unset location.
-  if (longitude === 0 && latitude === 0) {
-    return { latitude: '', longitude: '' }
-  }
 
   return {
     latitude: String(latitude),
@@ -82,7 +83,7 @@ function validateLocation(latitude, longitude) {
   if (!hasLatitude || !hasLongitude) {
     return {
       supplied: true,
-      error: 'Please enter both latitude and longitude.',
+      error: 'GPS location capture karo.',
     }
   }
 
@@ -92,21 +93,21 @@ function validateLocation(latitude, longitude) {
   if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
     return {
       supplied: true,
-      error: 'Latitude must be between -90 and 90.',
+      error: 'Invalid GPS latitude.',
     }
   }
 
   if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
     return {
       supplied: true,
-      error: 'Longitude must be between -180 and 180.',
+      error: 'Invalid GPS longitude.',
     }
   }
 
   if (lat === 0 && lng === 0) {
     return {
       supplied: true,
-      error: 'Please enter the actual ambulance location, not 0, 0.',
+      error: 'Valid GPS location nahi mili. Dobara try karo.',
     }
   }
 
@@ -117,11 +118,50 @@ function validateLocation(latitude, longitude) {
   }
 }
 
+function getCurrentGPS() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(
+        new Error('Is browser mein GPS location supported nahi hai.')
+      )
+      return
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+        })
+      },
+      (error) => {
+        const messages = {
+          1: 'Location permission allow karo.',
+          2: 'GPS location available nahi hai.',
+          3: 'Location request timeout ho gayi. Dobara try karo.',
+        }
+
+        reject(
+          new Error(messages[error.code] || 'GPS location nahi mil saki.')
+        )
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      }
+    )
+  })
+}
+
 export default function AmbulanceManagement() {
   const [ambulances, setAmbulances] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [gettingGPS, setGettingGPS] = useState(false)
+  const [gpsAccuracy, setGpsAccuracy] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -161,6 +201,7 @@ export default function AmbulanceManagement() {
   const openAddModal = () => {
     setEditingId(null)
     setForm({ ...EMPTY_FORM })
+    setGpsAccuracy(null)
     setModalOpen(true)
   }
 
@@ -168,6 +209,7 @@ export default function AmbulanceManagement() {
     const location = getCoordinates(ambulance)
 
     setEditingId(ambulance._id || ambulance.id)
+    setGpsAccuracy(null)
 
     setForm({
       vehicleNumber: ambulance.vehicleNumber || '',
@@ -186,11 +228,12 @@ export default function AmbulanceManagement() {
   }
 
   const closeModal = () => {
-    if (saving) return
+    if (saving || gettingGPS) return
 
     setModalOpen(false)
     setEditingId(null)
     setForm({ ...EMPTY_FORM })
+    setGpsAccuracy(null)
   }
 
   const handleChange = (event) => {
@@ -200,6 +243,32 @@ export default function AmbulanceManagement() {
       ...previous,
       [name]: value,
     }))
+
+    if (name === 'latitude' || name === 'longitude') {
+      setGpsAccuracy(null)
+    }
+  }
+
+  const captureGPS = async () => {
+    setGettingGPS(true)
+
+    try {
+      const location = await getCurrentGPS()
+
+      setForm((previous) => ({
+        ...previous,
+        latitude: String(location.latitude),
+        longitude: String(location.longitude),
+      }))
+
+      setGpsAccuracy(location.accuracy)
+
+      toast.success('Current GPS location mil gayi!')
+    } catch (error) {
+      toast.error(error.message || 'GPS location nahi mil saki.')
+    } finally {
+      setGettingGPS(false)
+    }
   }
 
   const handleSubmit = async (event) => {
@@ -208,7 +277,7 @@ export default function AmbulanceManagement() {
     const vehicleNumber = form.vehicleNumber.trim()
 
     if (!vehicleNumber) {
-      toast.error('Vehicle number is required.')
+      toast.error('Vehicle number required hai.')
       return
     }
 
@@ -220,7 +289,7 @@ export default function AmbulanceManagement() {
       fuelLevel < 0 ||
       fuelLevel > 100
     ) {
-      toast.error('Fuel level must be between 0 and 100.')
+      toast.error('Fuel level 0 se 100 ke beech hona chahiye.')
       return
     }
 
@@ -229,7 +298,7 @@ export default function AmbulanceManagement() {
       healthScore < 0 ||
       healthScore > 100
     ) {
-      toast.error('Health score must be between 0 and 100.')
+      toast.error('Health score 0 se 100 ke beech hona chahiye.')
       return
     }
 
@@ -267,17 +336,7 @@ export default function AmbulanceManagement() {
           ])
         }
 
-        toast.success(
-          locationValidation.supplied
-            ? 'Ambulance and location updated successfully.'
-            : 'Ambulance updated successfully.'
-        )
-
-        setModalOpen(false)
-        setEditingId(null)
-        setForm({ ...EMPTY_FORM })
-
-        await loadAmbulances()
+        toast.success('Ambulance details save ho gayi!')
       } else {
         const response = await ambulanceService.create(payload)
         const createdAmbulance = extractData(response)
@@ -290,34 +349,27 @@ export default function AmbulanceManagement() {
         if (locationValidation.supplied) {
           if (!createdId) {
             toast.error(
-              'Ambulance added, but its ID could not be found to save the location.'
+              'Ambulance add ho gayi, lekin location save karne ke liye ID nahi mili.'
             )
           } else {
-            try {
-              await ambulanceService.updateLocation(createdId, [
-                locationValidation.longitude,
-                locationValidation.latitude,
-              ])
+            await ambulanceService.updateLocation(createdId, [
+              locationValidation.longitude,
+              locationValidation.latitude,
+            ])
 
-              toast.success(
-                'Ambulance added with location successfully.'
-              )
-            } catch {
-              toast.error(
-                'Ambulance added, but location was not saved. Edit the ambulance and try again.'
-              )
-            }
+            toast.success('Ambulance aur GPS location save ho gayi!')
           }
         } else {
-          toast.success('Ambulance added successfully.')
+          toast.success('Ambulance add ho gayi!')
         }
-
-        setModalOpen(false)
-        setEditingId(null)
-        setForm({ ...EMPTY_FORM })
-
-        await loadAmbulances()
       }
+
+      setModalOpen(false)
+      setEditingId(null)
+      setForm({ ...EMPTY_FORM })
+      setGpsAccuracy(null)
+
+      await loadAmbulances()
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -349,13 +401,12 @@ export default function AmbulanceManagement() {
     return (
       !Array.isArray(coordinates) ||
       coordinates.length !== 2 ||
-      coordinates[0] === 0 && coordinates[1] === 0
+      (coordinates[0] === 0 && coordinates[1] === 0)
     )
   }).length
 
   return (
     <div className="space-y-6 text-white">
-      {/* Header */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <p className="text-sm font-medium uppercase tracking-[0.2em] text-cyan-400">
@@ -367,7 +418,7 @@ export default function AmbulanceManagement() {
           </h1>
 
           <p className="mt-2 text-sm text-slate-400">
-            Manage vehicles, drivers, status and live locations.
+            Manage ambulances, drivers, status and GPS locations.
           </p>
         </div>
 
@@ -389,7 +440,6 @@ export default function AmbulanceManagement() {
         </div>
       </div>
 
-      {/* Summary */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Total Ambulances"
@@ -416,11 +466,10 @@ export default function AmbulanceManagement() {
           title="Missing Location"
           value={missingLocationCount}
           icon={<FiMapPin />}
-          description="Coordinates need updating"
+          description="GPS location not saved"
         />
       </div>
 
-      {/* Location warning */}
       {missingLocationCount > 0 && (
         <div className="rounded-2xl border border-amber-400/30 bg-amber-400/10 p-4">
           <div className="flex items-start gap-3">
@@ -428,21 +477,19 @@ export default function AmbulanceManagement() {
 
             <div>
               <h2 className="font-semibold text-amber-200">
-                Ambulance location needs updating
+                GPS location required
               </h2>
 
               <p className="mt-1 text-sm text-amber-100/80">
-                {missingLocationCount} ambulance(s) have default or missing
-                coordinates. Select Edit Ambulance and enter the actual
-                latitude and longitude to show their correct location on
-                Live Tracking.
+                {missingLocationCount} ambulance(s) ki location saved
+                nahi hai. Edit Ambulance par jaakar Get Current GPS
+                use karo.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Ambulance cards */}
       {ambulances.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-10 text-center">
           <FiTruck className="mx-auto text-4xl text-slate-500" />
@@ -467,6 +514,7 @@ export default function AmbulanceManagement() {
           {ambulances.map((ambulance, index) => {
             const id = ambulance._id || ambulance.id
             const coordinates = ambulance.location?.coordinates || []
+
             const hasLocation =
               coordinates.length === 2 &&
               !(coordinates[0] === 0 && coordinates[1] === 0)
@@ -536,7 +584,7 @@ export default function AmbulanceManagement() {
                     value={
                       hasLocation
                         ? `${coordinates[1]}, ${coordinates[0]}`
-                        : 'Not configured (0, 0)'
+                        : 'GPS not configured'
                     }
                   />
 
@@ -577,7 +625,6 @@ export default function AmbulanceManagement() {
         </div>
       )}
 
-      {/* Add/Edit Modal */}
       {modalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
@@ -597,14 +644,14 @@ export default function AmbulanceManagement() {
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-400">
-                  Enter vehicle details and location coordinates.
+                  Enter vehicle details and capture GPS location.
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={closeModal}
-                disabled={saving}
+                disabled={saving || gettingGPS}
                 className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white"
                 aria-label="Close modal"
               >
@@ -631,7 +678,7 @@ export default function AmbulanceManagement() {
                     value={form.driver}
                     onChange={handleChange}
                     className={inputClass}
-                    placeholder="Enter driver's MongoDB ID"
+                    placeholder="Driver's MongoDB ID"
                   />
                 </FormField>
 
@@ -679,7 +726,6 @@ export default function AmbulanceManagement() {
                 )}
               </div>
 
-              {/* Location fields */}
               <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4">
                 <div className="mb-4 flex items-start gap-3">
                   <div className="rounded-xl bg-cyan-400/10 p-3 text-cyan-300">
@@ -688,51 +734,62 @@ export default function AmbulanceManagement() {
 
                   <div>
                     <h3 className="font-semibold">
-                      Ambulance Location
+                      GPS Location
                     </h3>
 
                     <p className="mt-1 text-sm text-slate-400">
-                      Enter the actual ambulance coordinates. Leave both
-                      fields empty if you do not want to change the saved
-                      location.
+                      Current device ki location automatically capture
+                      karne ke liye button dabao. Browser permission
+                      maange to Allow karo.
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField label="Latitude">
+                <Button
+                  type="button"
+                  onClick={captureGPS}
+                  disabled={gettingGPS || saving}
+                >
+                  <FiCrosshair
+                    className={`mr-2 ${gettingGPS ? 'animate-spin' : ''}`}
+                  />
+                  {gettingGPS
+                    ? 'Getting GPS...'
+                    : 'Get Current GPS'}
+                </Button>
+
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormField label="Captured Latitude">
                     <input
-                      type="number"
-                      name="latitude"
+                      type="text"
                       value={form.latitude}
-                      onChange={handleChange}
+                      readOnly
                       className={inputClass}
-                      placeholder="e.g. 26.8467"
-                      min="-90"
-                      max="90"
-                      step="any"
+                      placeholder="GPS capture karo"
                     />
                   </FormField>
 
-                  <FormField label="Longitude">
+                  <FormField label="Captured Longitude">
                     <input
-                      type="number"
-                      name="longitude"
+                      type="text"
                       value={form.longitude}
-                      onChange={handleChange}
+                      readOnly
                       className={inputClass}
-                      placeholder="e.g. 80.9462"
-                      min="-180"
-                      max="180"
-                      step="any"
+                      placeholder="GPS capture karo"
                     />
                   </FormField>
                 </div>
 
-                <p className="mt-3 text-xs text-slate-500">
-                  Note: Latitude and longitude are different. Use the
-                  ambulance's real location, not your laptop's location.
-                  Coordinates (0, 0) are treated as unset.
+                {gpsAccuracy !== null && (
+                  <p className="mt-3 text-sm text-emerald-300">
+                    GPS accuracy approximately {Math.round(gpsAccuracy)} metres.
+                  </p>
+                )}
+
+                <p className="mt-3 text-xs text-amber-200/80">
+                  Important: Ye button us device ki location capture karta
+                  hai jis par page khula hai. Ambulance ki live location
+                  ke liye driver ke phone par GPS tracking chalani hogi.
                 </p>
               </div>
 
@@ -740,12 +797,12 @@ export default function AmbulanceManagement() {
                 <Button
                   type="button"
                   onClick={closeModal}
-                  disabled={saving}
+                  disabled={saving || gettingGPS}
                 >
                   Cancel
                 </Button>
 
-                <Button type="submit" disabled={saving}>
+                <Button type="submit" disabled={saving || gettingGPS}>
                   {saving
                     ? 'Saving...'
                     : editingId
@@ -793,8 +850,7 @@ function StatusPill({ status }) {
   return (
     <span
       className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
-        styles[status] ||
-        'border-white/10 bg-white/5 text-slate-300'
+        styles[status] || 'border-white/10 bg-white/5 text-slate-300'
       }`}
     >
       {(status || 'unknown').replaceAll('_', ' ').toUpperCase()}
@@ -804,6 +860,7 @@ function StatusPill({ status }) {
 
 function MetricBar({ icon, label, value, suffix }) {
   const numericValue = Number(value)
+
   const safeValue = Number.isFinite(numericValue)
     ? Math.min(100, Math.max(0, numericValue))
     : 0
@@ -837,7 +894,9 @@ function InfoRow({ icon, label, value }) {
     <div className="flex items-start gap-3 text-sm">
       <span className="mt-0.5 text-slate-400">{icon}</span>
 
-      <span className="w-32 shrink-0 text-slate-400">{label}</span>
+      <span className="w-32 shrink-0 text-slate-400">
+        {label}
+      </span>
 
       <span className="min-w-0 break-all text-slate-200">
         {value || '—'}
