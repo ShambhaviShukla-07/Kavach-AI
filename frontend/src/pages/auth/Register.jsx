@@ -3,14 +3,16 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { ROLE_DASHBOARDS } from '../../utils/constants'
 import Button from '../../components/ui/Button'
+import PhoneInput from '../../components/ui/PhoneInput'
+import { getPhoneError } from '../../utils/phone'
 import toast from 'react-hot-toast'
-import { FiUser, FiMail, FiLock, FiPhone } from 'react-icons/fi'
+import { FiUser, FiMail, FiLock, FiUsers } from 'react-icons/fi'
 
-const roles = [
-  { value: 'citizen', label: '👤 Citizen', desc: 'Request emergency help' },
-  { value: 'dispatcher', label: '🎯 Dispatcher', desc: 'Manage & dispatch units' },
-  { value: 'driver', label: '🚑 Driver', desc: 'Respond to emergencies' },
-  { value: 'hospital_admin', label: '🏥 Hospital Admin', desc: 'Manage hospital intake' }
+const REGISTER_ROLES = [
+  { value: 'citizen', label: 'Citizen' },
+  { value: 'dispatcher', label: 'Dispatcher' },
+  { value: 'driver', label: 'Ambulance Driver' },
+  { value: 'hospital_admin', label: 'Hospital Admin' }
 ]
 
 export default function Register() {
@@ -24,6 +26,8 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (form.password.length < 6) { toast.error('Password must be at least 6 characters'); return }
+    const phoneError = getPhoneError(form.phone)
+    if (phoneError) { toast.error(phoneError); return }
     setLoading(true)
     try {
       const user = await register(form)
@@ -52,28 +56,20 @@ export default function Register() {
           <input type="email" required placeholder="Email address" value={form.email} onChange={e => set('email', e.target.value)} className={inputCls} />
         </div>
         <div className="relative">
-          <FiPhone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input type="tel" required placeholder="Phone number" value={form.phone} onChange={e => set('phone', e.target.value)} className={inputCls} />
+          <PhoneInput required value={form.phone} onChange={v => set('phone', v)} />
         </div>
         <div className="relative">
           <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input type="password" required placeholder="Password (min 6 chars)" value={form.password} onChange={e => set('password', e.target.value)} className={inputCls} />
         </div>
-
-        {/* Role selector */}
-        <div>
-          <label className="text-sm text-slate-400 mb-2 block">Select your role</label>
-          <div className="grid grid-cols-2 gap-2">
-            {roles.map(r => (
-              <button key={r.value} type="button" onClick={() => set('role', r.value)}
-                className={`p-3 rounded-xl text-left transition-all duration-200 border ${form.role === r.value ? 'border-cyan-400/50 bg-cyan-400/10 text-cyan-400' : 'glass-light text-slate-400 hover:border-slate-600'}`}>
-                <div className="text-sm font-semibold">{r.label}</div>
-                <div className="text-xs opacity-70 mt-0.5">{r.desc}</div>
-              </button>
+        <div className="relative">
+          <FiUsers className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <select value={form.role} onChange={e => set('role', e.target.value)} className={inputCls}>
+            {REGISTER_ROLES.map(r => (
+              <option key={r.value} value={r.value} className="bg-slate-900">{r.label}</option>
             ))}
-          </div>
+          </select>
         </div>
-
         <Button type="submit" loading={loading} className="w-full" size="lg">Create Account</Button>
       </form>
 

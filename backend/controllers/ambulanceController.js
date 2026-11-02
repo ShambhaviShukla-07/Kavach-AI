@@ -216,7 +216,7 @@ const updateLocation = asyncHandler(async (req, res) => {
   }
 
   // Only the assigned driver or dispatcher may update this location.
-  const isDispatcher = req.user.role === 'dispatcher'
+  const isDispatcher = ['dispatcher', 'admin'].includes(req.user.role)
   const isAssignedDriver =
     req.user.role === 'driver' &&
     String(ambulance.driver || '') === String(req.user._id)
@@ -261,8 +261,32 @@ const getAvailable = asyncHandler(async (req, res) => {
   res.json(new ApiResponse(200, ambulances))
 })
 
+// GET /api/ambulance/drivers
+const getDrivers = asyncHandler(async (req, res) => {
+  const User = require('../models/User')
+
+  const drivers = await User.find({ role: 'driver', isActive: true })
+    .select('name email phone')
+    .sort({ name: 1 })
+    .lean()
+
+  const assigned = await Ambulance.find({ driver: { $in: drivers.map(d => d._id) } })
+    .select('driver vehicleNumber')
+    .lean()
+
+  const assignedMap = new Map(
+    assigned.map(a => [String(a.driver), { id: String(a._id), vehicleNumber: a.vehicleNumber }])
+  )
+
+  res.json(new ApiResponse(
+    200,
+    drivers.map(d => ({ ...d, ambulance: assignedMap.get(String(d._id)) || null }))
+  ))
+})
+
 module.exports = {
   getAmbulances,
+  getDrivers,
   createAmbulance,
   updateAmbulance,
   updateLocation,

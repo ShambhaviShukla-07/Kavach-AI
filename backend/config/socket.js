@@ -2,10 +2,11 @@ let io
 
 const initSocket = (server) => {
 const { Server } = require('socket.io')
+const { corsOrigin } = require('./origins')
 
 io = new Server(server, {
 cors: {
-origin: process.env.CLIENT_URL,
+origin: corsOrigin,
 methods: ['GET', 'POST'],
 credentials: true
 }

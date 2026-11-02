@@ -7,10 +7,13 @@ const SEVERITY_COLORS = {
 
 const STATUS_COLORS = {
   pending:    'text-yellow-400 bg-yellow-400/10 border border-yellow-400/20',
+  acknowledged: 'text-cyan-400 bg-cyan-400/10 border border-cyan-400/20',
   dispatched: 'text-blue-400 bg-blue-400/10 border border-blue-400/20',
   en_route:   'text-cyan-400 bg-cyan-400/10 border border-cyan-400/20',
   arrived:    'text-purple-400 bg-purple-400/10 border border-purple-400/20',
   resolved:   'text-green-400 bg-green-400/10 border border-green-400/20',
+  online:     'text-green-400 bg-green-400/10 border border-green-400/20',
+  offline:    'text-red-400 bg-red-400/10 border border-red-400/20',
   cancelled:  'text-red-400 bg-red-400/10 border border-red-400/20',
   active:     'text-red-400 bg-red-400/10 border border-red-400/20',
   false_alarm:'text-slate-400 bg-slate-400/10 border border-slate-400/20',

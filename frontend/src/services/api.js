@@ -1,7 +1,10 @@
 import axios from 'axios'
 
+// Set VITE_API_URL (e.g. https://api.example.com) when the backend is hosted separately.
+const API_ORIGIN = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+
 const api = axios.create({
-baseURL: '/api',
+baseURL: `${API_ORIGIN}/api`,
 withCredentials: true,
 headers: {
 'Content-Type': 'application/json'
@@ -11,7 +14,7 @@ headers: {
 // Attach JWT token to API requests
 api.interceptors.request.use(
 (config) => {
-const token = localStorage.getItem('kavach_token')
+const token = sessionStorage.getItem('kavach_token')
 
 if (token) {
   config.headers.Authorization = `Bearer ${token}`
@@ -37,8 +40,8 @@ const isAuthRequest =
   requestUrl.includes('/register')
 
 if (status === 401 && !isAuthRequest) {
-  localStorage.removeItem('kavach_token')
-  localStorage.removeItem('kavach_user')
+  sessionStorage.removeItem('kavach_token')
+  sessionStorage.removeItem('kavach_user')
 
   if (window.location.pathname !== '/login') {
     window.location.href = '/login'

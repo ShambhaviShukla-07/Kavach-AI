@@ -4,6 +4,7 @@ const User = require('../models/User');
 const ApiError = require('../utils/ApiError');
 const ApiResponse = require('../utils/ApiResponse');
 const asyncHandler = require('../utils/asyncHandler');
+const { normalizePhone, toE164 } = require('../utils/phone');
 
 // ==========================================
 // TEXTBEE SMS HELPER
@@ -20,17 +21,10 @@ const sendTextBeeSMS = async (phone, message) => {
     };
   }
 
-  // Normalize Indian phone numbers
-  let recipient = String(phone || '').replace(/[\s()-]/g, '');
+  // Saved numbers are E.164; older entries without a country code are read as Indian numbers.
+  const recipient = toE164(String(phone || ''), 'IN');
 
-  if (/^\d{10}$/.test(recipient)) {
-    recipient = `+91${recipient}`;
-  } else if (/^91\d{10}$/.test(recipient)) {
-    recipient = `+${recipient}`;
-  }
-
-  // Validate international phone number
-  if (!/^\+\d{8,15}$/.test(recipient)) {
+  if (!recipient) {
     console.error('Invalid TextBee recipient number');
     return {
       success: false,
@@ -89,7 +83,8 @@ const sendTextBeeSMS = async (phone, message) => {
 // ==========================================
 // VALIDATE EMERGENCY CONTACTS
 // ==========================================
-const validateContacts = (contacts) => {
+// lenientPhone lets SOS accept older saved numbers that have no country code.
+const validateContacts = (contacts, lenientPhone = false) => {
   if (!Array.isArray(contacts)) {
     throw new ApiError(
       400,
@@ -135,7 +130,10 @@ const validateContacts = (contacts) => {
 
     return {
       name: contact.name.trim(),
-      phone: contact.phone.trim(),
+      phone: lenientPhone
+        ? toE164(contact.phone, 'IN') ||
+          normalizePhone(contact.phone, `Phone number for ${contact.name.trim()}`)
+        : normalizePhone(contact.phone, `Phone number for ${contact.name.trim()}`),
       email
     };
   });
@@ -349,7 +347,7 @@ const triggerSOS = asyncHandler(async (req, res) => {
   let safeContacts;
 
   if (Array.isArray(emergencyContacts)) {
-    safeContacts = validateContacts(emergencyContacts);
+    safeContacts = validateContacts(emergencyContacts, true);
   } else {
     const savedUser = await User.findById(
       req.user._id

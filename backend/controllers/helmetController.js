@@ -1,4 +1,5 @@
 const HelmetEvent = require('../models/HelmetEvent')
+const HelmetDevice = require('../models/HelmetDevice')
 const Emergency = require('../models/Emergency')
 const User = require('../models/User')
 const ApiError = require('../utils/ApiError')
@@ -189,17 +190,7 @@ const createHelmetEvent = asyncHandler(async (req, res) => {
 
 // GET /api/helmet/events
 const listHelmetEvents = asyncHandler(async (req, res) => {
-  const query = {}
-
-  if (req.user.role === 'citizen') {
-    query.rider = req.user._id
-  } else if (
-    !['dispatcher', 'admin', 'hospital_admin'].includes(req.user.role)
-  ) {
-    throw new ApiError(403, 'Not authorized to view helmet events')
-  }
-
-  const events = await HelmetEvent.find(query)
+  const events = await HelmetEvent.find({})
     .populate('rider', 'name email phone')
     .populate('emergency', 'type severity status')
     .sort({ createdAt: -1 })
@@ -210,25 +201,17 @@ const listHelmetEvents = asyncHandler(async (req, res) => {
 
 // GET /api/helmet/stats
 const getHelmetStats = asyncHandler(async (req, res) => {
-  const match =
-    req.user.role === 'citizen'
-      ? { rider: req.user._id }
-      : {}
-
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000)
 
   const [total, crashes, last24h, newEvents] = await Promise.all([
-    HelmetEvent.countDocuments(match),
+    HelmetEvent.countDocuments({}),
     HelmetEvent.countDocuments({
-      ...match,
       'prediction.isCrash': true
     }),
     HelmetEvent.countDocuments({
-      ...match,
       createdAt: { $gte: since }
     }),
     HelmetEvent.countDocuments({
-      ...match,
       status: 'new'
     })
   ])
@@ -260,13 +243,20 @@ const updateHelmetEventStatus = asyncHandler(async (req, res) => {
   event.status = req.body.status
 
   if (event.status === 'false_alarm' && event.emergency) {
-    await Emergency.findOneAndUpdate(
-      {
-        _id: event.emergency,
-        status: { $in: ['pending', 'dispatched'] }
-      },
-      { status: 'cancelled' }
-    )
+    const emergency = await Emergency.findOne({
+      _id: event.emergency,
+      status: { $in: ['pending', 'acknowledged', 'dispatched'] }
+    })
+
+    if (emergency) {
+      emergency.status = 'cancelled'
+      emergency.statusHistory.push({
+        status: 'cancelled',
+        changedBy: req.user._id,
+        source: 'admin'
+      })
+      await emergency.save()
+    }
   }
 
   await event.save()
@@ -276,10 +266,56 @@ const updateHelmetEventStatus = asyncHandler(async (req, res) => {
   )
 })
 
+const DEVICE_ONLINE_WINDOW_MS = 60 * 1000
+
+// GET /api/helmet/device
+const getHelmetDeviceStatus = asyncHandler(async (req, res) => {
+  const incidentQuery = { deviceId: { $ne: null } }
+
+  const [devices, incidents, openEmergencies] = await Promise.all([
+    HelmetDevice.find().sort({ updatedAt: -1 }).limit(20),
+    Emergency.find(incidentQuery)
+      .populate('citizen', 'name phone')
+      .populate('statusHistory.changedBy', 'name email role')
+      .sort({ createdAt: -1 })
+      .limit(100),
+    Emergency.countDocuments({
+      ...incidentQuery,
+      status: { $nin: ['resolved', 'cancelled'] }
+    })
+  ])
+
+  const now = Date.now()
+
+  res.json(
+    new ApiResponse(200, {
+      summary: {
+        registeredHelmets: devices.length,
+        openEmergencies,
+        smsLogRecords: devices.reduce(
+          (total, device) => total + device.smsResults.length,
+          0
+        )
+      },
+      devices: devices.map((device) => ({
+        deviceId: device.deviceId,
+        online: now - device.updatedAt.getTime() < DEVICE_ONLINE_WINDOW_MS,
+        lastSeen: device.updatedAt,
+        location: device.location,
+        gpsPoints: device.gpsPointCount,
+        buzzerActive: device.buzzerActive,
+        smsResults: device.smsResults.slice(-50).reverse()
+      })),
+      incidents
+    })
+  )
+})
+
 module.exports = {
   deviceOrUser,
   createHelmetEvent,
   listHelmetEvents,
   getHelmetStats,
-  updateHelmetEventStatus
+  updateHelmetEventStatus,
+  getHelmetDeviceStatus
 }

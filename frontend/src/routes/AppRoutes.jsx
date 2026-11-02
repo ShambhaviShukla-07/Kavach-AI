@@ -110,9 +110,6 @@ export default function AppRoutes() {
           }
         />
 
-        
-
-
         {/* Dispatcher */}
         <Route
           path="/dispatcher/dashboard"
@@ -122,14 +119,6 @@ export default function AppRoutes() {
             </RoleRoute>
           }
         />
-<Route
-  path="/dispatcher/helmet"
-  element={
-    <RoleRoute roles={['dispatcher']}>
-      <HelmetMonitor />
-    </RoleRoute>
-  }
-/>
         <Route
           path="/dispatcher/emergencies"
           element={
@@ -186,6 +175,15 @@ export default function AppRoutes() {
         />
 
         {/* Hospital */}
+        <Route
+          path="/admin/helmet"
+          element={
+            <RoleRoute roles={['admin']}>
+              <HelmetMonitor />
+            </RoleRoute>
+          }
+        />
+
         <Route
           path="/hospital/dashboard"
           element={

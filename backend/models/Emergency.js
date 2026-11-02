@@ -1,11 +1,40 @@
 
 const mongoose = require('mongoose')
 
+const emergencyStatusHistorySchema = new mongoose.Schema({
+  status: {
+    type: String,
+    enum: [
+      'pending',
+      'acknowledged',
+      'dispatched',
+      'en_route',
+      'arrived',
+      'resolved',
+      'cancelled'
+    ],
+    required: true
+  },
+  changedAt: { type: Date, default: Date.now, required: true },
+  changedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  source: {
+    type: String,
+    enum: ['citizen', 'helmet', 'admin', 'dispatcher', 'driver', 'system'],
+    default: 'system'
+  }
+}, { _id: false })
+
 const emergencySchema = new mongoose.Schema({
   citizen: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: function () {
+      return !this.deviceId
+    },
     index: true
   },
 
@@ -24,6 +53,17 @@ const emergencySchema = new mongoose.Schema({
   description: {
     type: String,
     default: ''
+  },
+
+  deviceId: {
+    type: String,
+    default: null,
+    index: true
+  },
+
+  deviceEventId: {
+    type: String,
+    default: null
   },
 
   location: {
@@ -78,6 +118,7 @@ const emergencySchema = new mongoose.Schema({
     type: String,
     enum: [
       'pending',
+      'acknowledged',
       'dispatched',
       'en_route',
       'arrived',
@@ -85,6 +126,11 @@ const emergencySchema = new mongoose.Schema({
       'cancelled'
     ],
     default: 'pending'
+  },
+
+  statusHistory: {
+    type: [emergencyStatusHistorySchema],
+    default: []
   },
 
   assignedAmbulance: {
@@ -131,6 +177,10 @@ const emergencySchema = new mongoose.Schema({
 
 // Geospatial index for location-based emergency searches
 emergencySchema.index({ location: '2dsphere' })
+emergencySchema.index(
+  { deviceId: 1, deviceEventId: 1 },
+  { unique: true, partialFilterExpression: { deviceEventId: { $type: 'string' } } }
+)
 
 module.exports = mongoose.model('Emergency', emergencySchema)
 

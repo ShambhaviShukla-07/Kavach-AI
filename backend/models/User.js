@@ -1,6 +1,7 @@
 
 const mongoose = require('mongoose')
 const bcrypt = require('bcryptjs')
+const { isValidPhone } = require('../utils/phone')
 
 // Emergency contact schema for the Women Safety module
 const emergencyContactSchema = new mongoose.Schema({
@@ -53,12 +54,23 @@ const userSchema = new mongoose.Schema({
 
   phone: {
     type: String,
-    required: true
+    required: function () {
+      return this.role !== 'admin'
+    },
+    validate: {
+      validator: function (value) {
+        if (!value && this.role === 'admin') return true
+        // Older accounts keep their stored number until it is changed.
+        if (typeof this.isModified === 'function' && !this.isModified('phone')) return true
+        return isValidPhone(value)
+      },
+      message: 'Please enter a valid phone number with country code'
+    }
   },
 
   role: {
     type: String,
-    enum: ['citizen', 'dispatcher', 'driver', 'hospital_admin'],
+    enum: ['citizen', 'dispatcher', 'driver', 'hospital_admin', 'admin'],
     default: 'citizen'
   },
 

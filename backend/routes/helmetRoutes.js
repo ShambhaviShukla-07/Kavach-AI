@@ -5,23 +5,28 @@ const {
   createHelmetEvent,
   listHelmetEvents,
   getHelmetStats,
-  updateHelmetEventStatus
+  updateHelmetEventStatus,
+  getHelmetDeviceStatus
 } = require('../controllers/helmetController')
 
 const { protect } = require('../middlewares/authMiddleware')
-const { authorize } = require('../middlewares/roleMiddleware')
+const {
+  requireAdmin,
+  requireAdminOrDevice
+} = require('../middlewares/adminMiddleware')
 
 const router = express.Router()
 
-router.post('/events', deviceOrUser, createHelmetEvent)
+router.post('/events', deviceOrUser, requireAdminOrDevice, createHelmetEvent)
 
-router.get('/events', protect, listHelmetEvents)
-router.get('/stats', protect, getHelmetStats)
+router.get('/events', protect, requireAdmin, listHelmetEvents)
+router.get('/stats', protect, requireAdmin, getHelmetStats)
+router.get('/device', protect, requireAdmin, getHelmetDeviceStatus)
 
 router.patch(
   '/events/:id/status',
   protect,
-  authorize('dispatcher', 'admin'),
+  requireAdmin,
   updateHelmetEventStatus
 )
 

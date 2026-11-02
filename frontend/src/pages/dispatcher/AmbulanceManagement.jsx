@@ -165,6 +165,20 @@ export default function AmbulanceManagement() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [drivers, setDrivers] = useState([])
+
+  const loadDrivers = useCallback(async () => {
+    try {
+      const result = extractData(await ambulanceService.getDrivers())
+      setDrivers(Array.isArray(result) ? result : [])
+    } catch (error) {
+      toast.error(getErrorMessage(error))
+    }
+  }, [])
+
+  useEffect(() => {
+    loadDrivers()
+  }, [loadDrivers])
 
   const loadAmbulances = useCallback(async (showLoader = false) => {
     if (showLoader) setRefreshing(true)
@@ -202,6 +216,7 @@ export default function AmbulanceManagement() {
     setEditingId(null)
     setForm({ ...EMPTY_FORM })
     setGpsAccuracy(null)
+    loadDrivers()
     setModalOpen(true)
   }
 
@@ -210,6 +225,7 @@ export default function AmbulanceManagement() {
 
     setEditingId(ambulance._id || ambulance.id)
     setGpsAccuracy(null)
+    loadDrivers()
 
     setForm({
       vehicleNumber: ambulance.vehicleNumber || '',
@@ -369,7 +385,7 @@ export default function AmbulanceManagement() {
       setForm({ ...EMPTY_FORM })
       setGpsAccuracy(null)
 
-      await loadAmbulances()
+      await Promise.all([loadAmbulances(), loadDrivers()])
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -670,14 +686,45 @@ export default function AmbulanceManagement() {
                   />
                 </FormField>
 
-                <FormField label="Driver ID (optional)">
-                  <input
+                <FormField label="Driver (optional)">
+                  <select
                     name="driver"
                     value={form.driver}
                     onChange={handleChange}
                     className={inputClass}
-                    placeholder="Driver's MongoDB ID"
-                  />
+                  >
+                    <option value="">No driver assigned</option>
+                    {drivers.map((driver) => {
+                      const busyElsewhere =
+                        driver.ambulance &&
+                        driver.ambulance.id !== editingId
+
+                      return (
+                        <option key={driver._id} value={driver._id}>
+                          {driver.name} ({driver.phone || driver.email})
+                          {busyElsewhere
+                            ? ` — on ${driver.ambulance.vehicleNumber}`
+                            : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+
+                  <p className="mt-2 text-xs text-slate-400">
+                    Driver list mein nahi hai? Driver ko{' '}
+                    <span className="text-cyan-400">
+                      {window.location.origin}/register
+                    </span>{' '}
+                    par "Ambulance Driver" role se register karwao, phir{' '}
+                    <button
+                      type="button"
+                      onClick={loadDrivers}
+                      className="font-semibold text-cyan-400 hover:text-cyan-300"
+                    >
+                      list refresh karo
+                    </button>
+                    .
+                  </p>
                 </FormField>
 
                 <FormField label="Fuel Level (%)">

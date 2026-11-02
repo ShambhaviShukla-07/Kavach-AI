@@ -5,10 +5,12 @@ const ApiError = require('../utils/ApiError')
 const ApiResponse = require('../utils/ApiResponse')
 const asyncHandler = require('../utils/asyncHandler')
 const Notification = require('../models/Notification')
+const Hospital = require('../models/Hospital')
 const { getIO } = require('../config/socket')
 
 const VALID_STATUSES = [
   'pending',
+  'acknowledged',
   'dispatched',
   'en_route',
   'arrived',
@@ -51,6 +53,11 @@ const createEmergency = asyncHandler(async (req, res) => {
     type,
     severity: severity || 'high',
     description: description || '',
+    statusHistory: [{
+      status: 'pending',
+      changedBy: req.user._id,
+      source: 'citizen'
+    }],
     location: {
       type: 'Point',
       coordinates: [longitude, latitude],
@@ -73,6 +80,9 @@ const getEmergencies = asyncHandler(async (req, res) => {
     query.citizen = req.user._id
   } else if (req.user.role === 'driver') {
     query.assignedDriver = req.user._id
+  } else if (req.user.role === 'hospital_admin') {
+    const hospitals = await Hospital.find({ admin: req.user._id }).select('_id')
+    query.assignedHospital = { $in: hospitals.map((h) => h._id) }
   } else if (!['dispatcher', 'admin'].includes(req.user.role)) {
     throw new ApiError(403, 'Not authorized to view these emergencies')
   }
@@ -155,6 +165,11 @@ const dispatchEmergency = asyncHandler(async (req, res) => {
   }
 
   emergency.status = 'dispatched'
+  emergency.statusHistory.push({
+    status: 'dispatched',
+    changedBy: req.user._id,
+    source: req.user.role === 'admin' ? 'admin' : 'dispatcher'
+  })
   emergency.assignedAmbulance = ambulance._id
   emergency.assignedDriver = driverId || ambulance.driver || null
   emergency.assignedHospital = hospitalId || null
@@ -204,12 +219,21 @@ const updateStatus = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'This emergency is already closed')
   }
 
-  const allowedTransitions = {
-    pending: ['dispatched', 'cancelled'],
-    dispatched: ['en_route', 'arrived', 'resolved', 'cancelled'],
-    en_route: ['arrived', 'resolved', 'cancelled'],
-    arrived: ['resolved', 'cancelled']
-  }
+  const allowedTransitions = emergency.deviceId
+    ? {
+      pending: ['acknowledged', 'cancelled'],
+      acknowledged: ['resolved', 'cancelled'],
+      dispatched: ['en_route', 'arrived', 'resolved', 'cancelled'],
+      en_route: ['arrived', 'resolved', 'cancelled'],
+      arrived: ['resolved', 'cancelled']
+    }
+    : {
+      pending: ['acknowledged', 'dispatched', 'resolved', 'cancelled'],
+      acknowledged: ['dispatched', 'resolved', 'cancelled'],
+      dispatched: ['en_route', 'arrived', 'resolved', 'cancelled'],
+      en_route: ['arrived', 'resolved', 'cancelled'],
+      arrived: ['resolved', 'cancelled']
+    }
 
   if (!allowedTransitions[emergency.status]?.includes(status)) {
     throw new ApiError(
@@ -224,6 +248,11 @@ const updateStatus = asyncHandler(async (req, res) => {
   }
 
   emergency.status = status
+  emergency.statusHistory.push({
+    status,
+    changedBy: req.user._id,
+    source: req.user.role === 'admin' ? 'admin' : req.user.role
+  })
 
   if (status === 'resolved') {
     emergency.resolvedAt = new Date()
@@ -248,30 +277,28 @@ const updateStatus = asyncHandler(async (req, res) => {
       await ambulance.save()
     }
   }
-  // Create notification for the citizen
-try {
-const Notification = require('../models/Notification')
-const { getIO } = require('../config/socket')
+  if (status === 'dispatched') {
+    try {
+      const notification = await Notification.create({
+        user: emergency.citizen,
+        title: 'Ambulance Assigned',
+        message: 'An ambulance has been assigned to your emergency request.',
+        type: 'dispatch',
+        link: '/citizen/dashboard'
+      })
 
-const notification = await Notification.create({
-  user: emergency.citizen,
-  title: 'Ambulance Assigned 🚑',
-  message: 'An ambulance has been assigned to your emergency request.',
-  type: 'dispatch',
-  link: '/citizen/dashboard'
-})
-
-getIO()
-  .to(`user_${emergency.citizen}`)
-  .emit('new_notification', notification)
-
-} catch (error) {
-console.error('Notification creation failed:', error.message)
-}
+      getIO()
+        .to(`user_${emergency.citizen}`)
+        .emit('new_notification', notification)
+    } catch (error) {
+      console.error('Notification creation failed:', error.message)
+    }
+  }
 
 
   const updated = await Emergency.findById(emergency._id)
     .populate('citizen', 'name phone')
+    .populate('statusHistory.changedBy', 'name email role')
     .populate('assignedAmbulance', 'vehicleNumber status')
     .populate('assignedDriver', 'name phone')
     .populate('assignedHospital', 'name address phone')

@@ -24,6 +24,8 @@ import VoiceSosButton from '../../components/VoiceSosButton'
 import { useVoiceAssistant } from '../../hooks/useVoiceAssistant'
 import Loader from '../../components/common/Loader'
 import toast from 'react-hot-toast'
+import PhoneInput from '../../components/ui/PhoneInput'
+import { getPhoneError, isPhoneValid, normalizeStoredPhone } from '../../utils/phone'
 
 const inputClass =
   'w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-pink-400 focus:ring-2 focus:ring-pink-400/20'
@@ -73,7 +75,7 @@ export default function WomenSafety() {
             Array.isArray(data) && data.length
               ? data.map((contact) => ({
                   name: contact.name || '',
-                  phone: contact.phone || '',
+                  phone: normalizeStoredPhone(contact.phone),
                   email: contact.email || '',
                 }))
               : [emptyContact()]
@@ -152,6 +154,17 @@ export default function WomenSafety() {
       return
     }
 
+    const invalidContact = filledContacts.find((contact) =>
+      getPhoneError(contact.phone)
+    )
+
+    if (invalidContact) {
+      toast.error(
+        `${invalidContact.name}: ${getPhoneError(invalidContact.phone)}`
+      )
+      return
+    }
+
     if (filledContacts.length > 10) {
       toast.error('Maximum 10 contacts allowed')
       return
@@ -203,7 +216,7 @@ export default function WomenSafety() {
     const filledContacts = contacts
       .filter(
         (contact) =>
-          contact.name.trim() && contact.phone.trim()
+          contact.name.trim() && isPhoneValid(contact.phone)
       )
       .map((contact) => ({
         name: contact.name.trim(),
@@ -592,25 +605,21 @@ export default function WomenSafety() {
                       />
                     </label>
 
-                    <label className="block">
+                    <div className="block">
                       <span className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-400">
                         <FiPhone />
                         Phone Number
                       </span>
-                      <input
-                        type="tel"
+                      <PhoneInput
                         value={contact.phone}
-                        onChange={(event) =>
-                          updateContact(
-                            index,
-                            'phone',
-                            event.target.value
-                          )
+                        onChange={(phone) =>
+                          updateContact(index, 'phone', phone)
                         }
-                        placeholder="Enter phone number"
-                        className={inputClass}
+                        placeholder="Phone number (digits only)"
+                        disabled={savingContacts}
+                        fieldClass={inputClass}
                       />
-                    </label>
+                    </div>
 
                     <label className="block md:col-span-2">
                       <span className="mb-2 flex items-center gap-2 text-xs font-medium text-slate-400">

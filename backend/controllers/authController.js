@@ -5,6 +5,10 @@ const User = require('../models/User')
 const ApiError = require('../utils/ApiError')
 const ApiResponse = require('../utils/ApiResponse')
 const asyncHandler = require('../utils/asyncHandler')
+const { isConfiguredAdminEmail } = require('../utils/adminAccess')
+const { normalizePhone } = require('../utils/phone')
+
+const SELF_REGISTER_ROLES = ['citizen', 'dispatcher', 'driver', 'hospital_admin']
 
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -19,7 +23,20 @@ const register = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'All fields required')
   }
 
+  // Admin accounts can never be self-registered.
+  const selectedRole = role || 'citizen'
+
+  if (!SELF_REGISTER_ROLES.includes(selectedRole)) {
+    throw new ApiError(400, 'Invalid role selected')
+  }
+
   const normalizedEmail = email.trim().toLowerCase()
+
+  if (isConfiguredAdminEmail(normalizedEmail)) {
+    throw new ApiError(403, 'This email is reserved for an administrator account')
+  }
+
+  const normalizedPhone = normalizePhone(phone)
 
   const exists = await User.findOne({ email: normalizedEmail })
 
@@ -31,8 +48,8 @@ const register = asyncHandler(async (req, res) => {
     name,
     email: normalizedEmail,
     password,
-    phone,
-    role: role || 'citizen'
+    phone: normalizedPhone,
+    role: selectedRole
   })
 
   const token = generateToken(user._id)
@@ -58,6 +75,10 @@ const login = asyncHandler(async (req, res) => {
     throw new ApiError(401, 'Invalid credentials')
   }
 
+  if (user.role === 'admin' && !isConfiguredAdminEmail(user.email)) {
+    throw new ApiError(401, 'Invalid credentials')
+  }
+
   const token = generateToken(user._id)
 
   user.password = undefined
@@ -75,10 +96,14 @@ const getMe = asyncHandler(async (req, res) => {
 // PUT /api/auth/update-profile
 const updateProfile = asyncHandler(async (req, res) => {
   const { name, phone } = req.body
+  const updates = {}
+
+  if (name !== undefined) updates.name = name
+  if (phone !== undefined) updates.phone = normalizePhone(phone)
 
   const user = await User.findByIdAndUpdate(
     req.user._id,
-    { name, phone },
+    updates,
     { new: true, runValidators: true }
   )
 

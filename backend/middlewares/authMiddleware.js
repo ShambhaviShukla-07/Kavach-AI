@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken')
 const User = require('../models/User')
 const ApiError = require('../utils/ApiError')
 const asyncHandler = require('../utils/asyncHandler')
+const { isConfiguredAdminEmail } = require('../utils/adminAccess')
 
 const protect = asyncHandler(async (req, res, next) => {
   let token
@@ -13,6 +14,12 @@ const protect = asyncHandler(async (req, res, next) => {
   const decoded = jwt.verify(token, process.env.JWT_SECRET)
   req.user = await User.findById(decoded.id).select('-password')
   if (!req.user) throw new ApiError(401, 'User not found')
+  if (
+    req.user.role === 'admin' &&
+    !isConfiguredAdminEmail(req.user.email)
+  ) {
+    throw new ApiError(401, 'Admin account is not configured')
+  }
   next()
 })
 

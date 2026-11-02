@@ -76,3 +76,11 @@ ai-service/.venv/
 .pytest_cache/
 ai-service/models/*.joblib
 ai-service/training/*.csv
+device-service/.venv/
+device-service/venv/
+device-service/*.db
+
+# ========================
+# Firmware secrets
+# ========================
+firmware/**/secrets.h

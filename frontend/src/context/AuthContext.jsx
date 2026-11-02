@@ -6,16 +6,16 @@ const AuthContext = createContext(null)
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('kavach_user')) } catch { return null }
+    try { return JSON.parse(sessionStorage.getItem('kavach_user')) } catch { return null }
   })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem('kavach_token')
+    const token = sessionStorage.getItem('kavach_token')
     if (token) {
       authService.getMe()
         .then(res => setUser(res.data.data))
-        .catch(() => { localStorage.removeItem('kavach_token'); localStorage.removeItem('kavach_user') })
+        .catch(() => { sessionStorage.removeItem('kavach_token'); sessionStorage.removeItem('kavach_user') })
         .finally(() => setLoading(false))
     } else {
       setLoading(false)
@@ -25,8 +25,8 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const res = await authService.login({ email, password })
     const { user, token } = res.data.data
-    localStorage.setItem('kavach_token', token)
-    localStorage.setItem('kavach_user', JSON.stringify(user))
+    sessionStorage.setItem('kavach_token', token)
+    sessionStorage.setItem('kavach_user', JSON.stringify(user))
     setUser(user)
     toast.success(`Welcome back, ${user.name}!`)
     return user
@@ -35,16 +35,16 @@ export const AuthProvider = ({ children }) => {
   const register = async (data) => {
     const res = await authService.register(data)
     const { user, token } = res.data.data
-    localStorage.setItem('kavach_token', token)
-    localStorage.setItem('kavach_user', JSON.stringify(user))
+    sessionStorage.setItem('kavach_token', token)
+    sessionStorage.setItem('kavach_user', JSON.stringify(user))
     setUser(user)
     toast.success('Account created successfully!')
     return user
   }
 
   const logout = () => {
-    localStorage.removeItem('kavach_token')
-    localStorage.removeItem('kavach_user')
+    sessionStorage.removeItem('kavach_token')
+    sessionStorage.removeItem('kavach_user')
     setUser(null)
     toast.success('Logged out')
   }

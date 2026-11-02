@@ -2,7 +2,8 @@ export const ROLES = {
   CITIZEN: 'citizen',
   DISPATCHER: 'dispatcher',
   DRIVER: 'driver',
-  HOSPITAL: 'hospital_admin'
+  HOSPITAL: 'hospital_admin',
+  ADMIN: 'admin'
 }
 
 export const EMERGENCY_TYPES = [
@@ -33,5 +34,6 @@ export const ROLE_DASHBOARDS = {
   citizen: '/citizen/dashboard',
   dispatcher: '/dispatcher/dashboard',
   driver: '/driver/dashboard',
-  hospital_admin: '/hospital/dashboard'
+  hospital_admin: '/hospital/dashboard',
+  admin: '/admin/helmet'
 }

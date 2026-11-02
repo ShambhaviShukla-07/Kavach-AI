@@ -10,7 +10,7 @@ FiMapPin,
 FiShield,
 FiLogOut,
 FiUser,
-FiHeart
+FiHeart,
 } from 'react-icons/fi'
 import { useAuth } from '../../context/AuthContext'
 
@@ -27,7 +27,23 @@ dispatcher: [
 { to: '/dispatcher/emergencies', icon: <FiAlertCircle />, label: 'Emergency Requests' },
 { to: '/dispatcher/ambulances', icon: <FiTruck />, label: 'Ambulance Management' },
 { to: '/dispatcher/tracking', icon: <FiMapPin />, label: 'Live Tracking' },
-{ to: '/dispatcher/helmet', icon: <FiShield />, label: 'Helmet Monitor' },
+],
+
+admin: [
+{ to: '/admin/helmet', icon: <FiShield />, label: 'Helmet Monitor' },
+{ to: '/dispatcher/dashboard', icon: <FiHome />, label: 'Operations Dashboard' },
+{ to: '/dispatcher/emergencies', icon: <FiAlertCircle />, label: 'Emergency Requests' },
+{ to: '/dispatcher/ambulances', icon: <FiTruck />, label: 'Ambulance Management' },
+{ to: '/dispatcher/tracking', icon: <FiMapPin />, label: 'Live Tracking' },
+{ to: '/hospital/dashboard', icon: <FiHome />, label: 'Hospital Dashboard' },
+{ to: '/hospital/admissions', icon: <FiHeart />, label: 'Admissions' },
+{ to: '/driver/active', icon: <FiTruck />, label: 'Driver Missions' },
+{ to: '/driver/history', icon: <FiActivity />, label: 'Driver History' },
+{ to: '/citizen/dashboard', icon: <FiHome />, label: 'Citizen Dashboard' },
+{ to: '/citizen/request', icon: <FiAlertCircle />, label: 'Request Ambulance' },
+{ to: '/citizen/ambulancedashboard', icon: <FiTruck />, label: 'Ambulance Module' },
+{ to: '/citizen/history', icon: <FiActivity />, label: 'Emergency History' },
+{ to: '/citizen/women-safety', icon: <FiHeart />, label: 'Women Safety' }
 ],
 
 driver: [
@@ -46,7 +62,8 @@ const roleColors = {
 citizen: 'from-cyan-400 to-blue-500',
 dispatcher: 'from-violet-400 to-indigo-500',
 driver: 'from-green-400 to-teal-500',
-hospital_admin: 'from-pink-400 to-rose-500'
+  hospital_admin: 'from-pink-400 to-rose-500',
+  admin: 'from-cyan-400 to-teal-500'
 }
 
 export default function Sidebar({ onClose }) {
